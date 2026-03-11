@@ -1,0 +1,33 @@
+# nanoDNS example configuration
+
+[general]
+log=/data/nanodns/nanodns.log
+debug=0
+
+[upstream]
+server=1.1.1.1
+server=8.8.8.8
+server=77.77.88.88
+timeout_ms=1500
+
+[overrides]
+*.playstation.com=0.0.0.0
+*.playstation.com.*=0.0.0.0
+playstation.com=0.0.0.0
+*.playstation.net=0.0.0.0
+*.playstation.net.*=0.0.0.0
+*.psndl.net=0.0.0.0
+playstation.net=0.0.0.0
+psndl.net=0.0.0.0
+# *.example.com=192.168.0.10
+# exact.host.local=10.0.0.42
+
+[exceptions]
+feature.api.playstation.com
+*.stun.playstation.net
+stun.*.playstation.net
+ena.net.playstation.net
+post.net.playstation.net
+gst.prod.dl.playstation.net
+# auth.api.playstation.net
+# *.allowed.playstation.net
