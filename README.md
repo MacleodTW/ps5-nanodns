@@ -1,6 +1,9 @@
-# nanoDNS for PS5
+# nanoDNS for Playstation
 
-Minimal PS5 payload DNS proxy that:
+# http://PS_IP:8080
+<img width="2823" height="1698" alt="image" src="https://github.com/user-attachments/assets/edbb5137-2b2e-449f-b7e0-15966257de01" />
+
+# Minimal Playstaiton payload DNS proxy that:
 
 - listens on all local IPv4 addresses on port `53`
 - applies local IPv4 overrides for domains matching shell-style masks
@@ -13,8 +16,9 @@ Minimal PS5 payload DNS proxy that:
 ## Build
 
 ```sh
-export PS5_PAYLOAD_SDK=/opt/ps5-payload-sdk
-make
+# Install PS4 or PS5 SDK before make
+make PS_HOST=ps4
+make PS_HOST=ps5
 ```
 
 ## Deploy
