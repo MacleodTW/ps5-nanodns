@@ -9,7 +9,7 @@
 #include <stdio.h>
 #include <sys/socket.h>
 
-#define APP_NAME "ps-NanoDNS"
+#define APP_NAME "PS-NanoDNS"
 #define APP_VERSION "1.2"
 #define APP_COPYRIGHT "(c) drakmor modified by macleod"
 
