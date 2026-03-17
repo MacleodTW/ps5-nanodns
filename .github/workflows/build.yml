@@ -1,19 +1,16 @@
-name: Rebuild With New SDK
+name: Build and Release
 
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  
 on:
   push:
-    paths-ignore:
-      - "**/*.md"
-      - '**/*.txt'
-  pull_request:
-    paths-ignore:
-      - "**/*.md"
-      - '**/*.txt'
+    branches: [main]
+  release:
+    types: [created]
   workflow_dispatch:
-
-concurrency:
-  group: ${{ github.ref }}-${{ github.event_name  }}
-  cancel-in-progress: true
 
 jobs:
   payload-build:
