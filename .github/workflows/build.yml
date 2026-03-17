@@ -57,5 +57,5 @@ jobs:
       if: github.event_name == 'release'
       uses: softprops/action-gh-release@v2
       with: 
-        files: ps4-nanodns.elf ps5-nanodns.elf
+        files: ps*-nanodns.elf
 
