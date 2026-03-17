@@ -44,3 +44,10 @@ jobs:
         name: ps5-nanodns.elf
         path: ps5-nanodns.elf
         if-no-files-found: error
+
+    - name: Upload release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+         files: ps5-nanodns.elf
+         
