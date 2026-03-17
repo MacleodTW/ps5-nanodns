@@ -14,6 +14,7 @@ static const char *k_default_config =
     "[general]\n"
     "log=" DEFAULT_LOG_PATH "\n"
     "debug=0\n"
+    "web_port=8080\n"
     "\n"
     "[upstream]\n"
     "server=8.8.8.8\n"
@@ -73,6 +74,7 @@ static void strip_inline_comment(char *s) {
 void config_set_defaults(app_config_t *cfg) {
   memset(cfg, 0, sizeof(*cfg));
   cfg->timeout_ms = DEFAULT_TIMEOUT_MS;
+  cfg->web_port = DEFAULT_WEB_PORT;
   cfg->debug_enabled = 0;
   snprintf(cfg->log_path, sizeof(cfg->log_path), "%s", DEFAULT_LOG_PATH);
 }
@@ -249,9 +251,10 @@ int load_config(const char *path, app_config_t *cfg) {
 
     if(*key == '\0' || *value == '\0') continue;
 
-    if(section == SECTION_GENERAL || (section == SECTION_NONE && (!strcasecmp(key, "log") || !strcasecmp(key, "debug")))) {
+    if(section == SECTION_GENERAL || (section == SECTION_NONE && (!strcasecmp(key, "log") || !strcasecmp(key, "debug") || !strcasecmp(key, "web_port")))) {
       if(!strcasecmp(key, "log")) snprintf(cfg->log_path, sizeof(cfg->log_path), "%s", value);
       else if(!strcasecmp(key, "debug")) cfg->debug_enabled = atoi(value) != 0 ? 1 : 0;
+      else if(!strcasecmp(key, "web_port")) cfg->web_port = atoi(value);
     } else if(section == SECTION_UPSTREAM) {
       if(!strcasecmp(key, "server") || !strcasecmp(key, "dns")) {
         if(!replace_upstreams) {
@@ -270,6 +273,7 @@ int load_config(const char *path, app_config_t *cfg) {
 
   fclose(fp);
   if(cfg->upstream_count == 0) config_apply_builtin_upstreams(cfg);
+  if(cfg->web_port <= 0 || cfg->web_port > 65535) cfg->web_port = DEFAULT_WEB_PORT;
 
   return 0;
 }
@@ -285,7 +289,8 @@ int config_save_all(const app_config_t *cfg) {
   
   fprintf(fp, "[general]\n");
   fprintf(fp, "log=%s\n", cfg->log_path);
-  fprintf(fp, "debug=%d\n\n", cfg->debug_enabled);
+  fprintf(fp, "debug=%d\n", cfg->debug_enabled);
+  fprintf(fp, "web_port=%d\n\n", cfg->web_port);
 
   fprintf(fp, "[upstream]\n");
   for (size_t i = 0; i < cfg->upstream_count; i++) {

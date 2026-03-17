@@ -6,6 +6,7 @@
 #include <sys/syscall.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
+#include <signal.h>
 
 #ifdef PS4_HOST
 #include <ps4/kernel.h>
@@ -28,7 +29,7 @@ static void on_signal(int signo) {
   g_running = 0;
 }
 
-// === 網路與系統環境初始化 ===
+// === Network and System Environment Initialization ===
 static int elevate_privileges(void) {
   pid_t pid = getpid();
   if(kernel_set_ucred_authid(pid, PRIVILEGED_AUTHID) != 0) return -1;
@@ -77,17 +78,25 @@ static int setup_tcp_socket(int port) {
   return fd;
 }
 
-// === 主程式 ===
+// === Main Program ===
 int main(void) {
   app_config_t cfg;
   int dns_fd = -1, web_fd = -1;
   struct pollfd pfds[2];
 
   (void)syscall(SYS_thr_set_name, -1, "nanodns.elf");
-  signal(SIGINT, on_signal);
-  signal(SIGTERM, on_signal);
+  
+  // Use sigaction instead of signal to avoid SA_RESTART
+  // This ensures blocking calls (like poll, recv) are interrupted on exit
+  struct sigaction sa;
+  memset(&sa, 0, sizeof(sa));
+  sa.sa_handler = on_signal;
+  sigemptyset(&sa.sa_mask);
+  sigaction(SIGINT, &sa, NULL);
+  sigaction(SIGTERM, &sa, NULL);
+  sigaction(SIGQUIT, &sa, NULL);
 
-  // 初始化設定檔
+  // Initialize configuration
   ensure_runtime_dir_exists(DATA_DIR);
   ensure_default_config_exists(CONFIG_PATH);
 
@@ -98,21 +107,23 @@ int main(void) {
     config_apply_builtin_exceptions(&cfg);
   }
 
-  // 初始化日誌
+  // Initialize logger
   logger_init(&cfg);
 
   if(elevate_privileges() != 0) {
+    log_errno("kernel_set_ucred_authid failed");
     logger_fini();
     return EXIT_FAILURE;
   }
 
   if(net_init() != 0) {
+    log_errno("net init failed");
     logger_fini();
     return 1;
   }
 
   dns_fd = setup_udp_socket(DNS_PORT);
-  web_fd = setup_tcp_socket(WEB_PORT);
+  web_fd = setup_tcp_socket(cfg.web_port);
 
   if(dns_fd < 0 || web_fd < 0) {
     log_errno("socket init failed");
@@ -123,7 +134,7 @@ int main(void) {
     return 1;
   }
 
-  log_printf("[nanodns] Started DNS on :%d, Web on :%d\n", DNS_PORT, WEB_PORT);
+  log_printf("[nanodns] Started DNS on :%d, Web on :%d\n", DNS_PORT, cfg.web_port);
 
   pfds[0].fd = dns_fd; pfds[0].events = POLLIN;
   pfds[1].fd = web_fd; pfds[1].events = POLLIN;

@@ -4,8 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/time.h>
 
-// URL 解碼器
+// URL Decoder
 static void url_decode(char *dst, const char *src) {
   char a, b;
   while (*src) {
@@ -38,6 +39,13 @@ void web_process_request(int listen_fd, app_config_t *cfg) {
   client_fd = accept(listen_fd, (struct sockaddr *)&client_addr, &client_len);
   if (client_fd < 0) return;
 
+  // Add: Set receive timeout to 2 seconds
+  // Prevents the thread from hanging indefinitely if a client connects but sends no data
+  struct timeval tv;
+  tv.tv_sec = 2;
+  tv.tv_usec = 0;
+  setsockopt(client_fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
   nread = recv(client_fd, buf, sizeof(buf) - 1, 0);
   if (nread <= 0) {
     close(client_fd);
@@ -47,16 +55,17 @@ void web_process_request(int listen_fd, app_config_t *cfg) {
 
   bool redirect = false;
 
-  // 處理 POST 請求
+  // Handle POST requests
   if (strncmp(buf, "POST ", 5) == 0) {
     char *body = strstr(buf, "\r\n\r\n");
     if (body) {
       body += 4;
       
-      // 處理更新一般設定 (Debug, Timeout, Upstreams)
+      // Handle updating general settings (Debug, Timeout, Web Port, Upstreams)
       if (strncmp(buf, "POST /update_settings", 21) == 0) {
         char *dbg_str = strstr(body, "debug=");
         char *to_str = strstr(body, "timeout=");
+        char *wp_str = strstr(body, "web_port=");
         char *u1_str = strstr(body, "upstream1=");
         char *u2_str = strstr(body, "upstream2=");
         char *u3_str = strstr(body, "upstream3=");
@@ -65,15 +74,20 @@ void web_process_request(int listen_fd, app_config_t *cfg) {
           int dbg = 0;
           sscanf(dbg_str, "debug=%d", &dbg);
           cfg->debug_enabled = dbg;
-          g_debug_enabled = dbg; // 立即套用到日誌系統
+          g_debug_enabled = dbg; // Apply to logger immediately
         }
         if (to_str) {
           int to = 1500;
           sscanf(to_str, "timeout=%d", &to);
           if (to > 0) cfg->timeout_ms = to;
         }
+        if (wp_str) {
+          int wp = DEFAULT_WEB_PORT;
+          sscanf(wp_str, "web_port=%d", &wp);
+          if (wp > 0 && wp <= 65535) cfg->web_port = wp;
+        }
 
-        // 重新配置 Upstreams
+        // Reconfigure Upstreams
         cfg->upstream_count = 0;
         char ip_buf[256], decoded[256];
 
@@ -90,7 +104,7 @@ void web_process_request(int listen_fd, app_config_t *cfg) {
           if (decoded[0]) config_add_upstream(cfg, decoded);
         }
 
-        // 防呆：如果全部清空，套用預設值 8.8.8.8
+        // Failsafe: If all cleared, apply default 8.8.8.8
         if (cfg->upstream_count == 0) {
           config_apply_builtin_upstreams(cfg);
         }
@@ -151,12 +165,12 @@ void web_process_request(int listen_fd, app_config_t *cfg) {
     }
   }
 
-  // 處理完 POST 重導向
+  // Redirect after handling POST
   if (redirect) {
     const char *resp = "HTTP/1.1 303 See Other\r\nLocation: /\r\n\r\n";
     send(client_fd, resp, strlen(resp), 0);
   }
-  // 渲染 GET 網頁
+  // Render GET webpage
   else {
     char *html = malloc(32768);
     if (html) {
@@ -177,14 +191,15 @@ void web_process_request(int listen_fd, app_config_t *cfg) {
         "</style></head><body>"
         "<h1>NanoDNS Dashboard (%s v%s)</h1>", APP_NAME, APP_VERSION);
 
-      // 渲染 General Settings 區塊
+      // Render General Settings section
       offset += snprintf(html + offset, 32768 - offset,
         "<div class='form-box'><h2>General Settings</h2>"
-        "<form action='/update_settings' method='POST'>"
+        "<form action='/update_settings' method='POST' onsubmit=\"return confirm('Are you sure you want to save these settings?\\n(Changing the Web Port requires a restart to take effect)');\">"
         "<label>Debug Log:</label> <select name='debug'>"
         "<option value='0' %s>Disabled</option>"
         "<option value='1' %s>Enabled</option>"
         "</select><br>"
+        "<label>Web Port:</label> <input type='number' name='web_port' value='%d' min='1' max='65535' required><br>"
         "<label>Timeout (ms):</label> <input type='number' name='timeout' value='%d' min='100' max='10000' required><br><br>"
         "<h3>Upstream Servers</h3>"
         "<label>Server 1:</label> <input type='text' name='upstream1' value='%s' placeholder='e.g. 8.8.8.8'><br>"
@@ -193,18 +208,19 @@ void web_process_request(int listen_fd, app_config_t *cfg) {
         "<input type='submit' value='Save Settings'></form></div>",
         cfg->debug_enabled ? "" : "selected",
         cfg->debug_enabled ? "selected" : "",
+        cfg->web_port,
         cfg->timeout_ms,
         cfg->upstream_count > 0 ? cfg->upstreams[0].text : "",
         cfg->upstream_count > 1 ? cfg->upstreams[1].text : "",
         cfg->upstream_count > 2 ? cfg->upstreams[2].text : ""
       );
 
-      // 渲染 Overrides 區塊
+      // Render Overrides section
       offset += snprintf(html + offset, 32768 - offset, "<h2>Overrides (%zu / %d)</h2><table><tr><th>Domain Mask</th><th>Target IP</th><th width='80'>Action</th></tr>", cfg->rule_count, MAX_RULES);
       for (size_t i = 0; i < cfg->rule_count; i++) {
         offset += snprintf(html + offset, 32768 - offset, 
           "<tr><td>%s</td><td>%s</td>"
-          "<td><form action='/del_override' method='POST' style='margin:0;'>"
+          "<td><form action='/del_override' method='POST' style='margin:0;' onsubmit=\"return confirm('Are you sure you want to delete this rule?');\">"
           "<input type='hidden' name='mask' value='%s'>"
           "<input type='submit' class='btn-del' value='Delete'></form></td></tr>", 
           cfg->rules[i].mask, cfg->rules[i].text, cfg->rules[i].mask);
@@ -213,18 +229,18 @@ void web_process_request(int listen_fd, app_config_t *cfg) {
 
       offset += snprintf(html + offset, 32768 - offset,
         "<div class='form-box'>"
-        "<form action='/add_override' method='POST'>"
+        "<form action='/add_override' method='POST' onsubmit=\"return confirm('Are you sure you want to add this rule?');\">"
         "<b>Add Override: </b>"
         "<input type='text' name='mask' placeholder='e.g., *.playstation.com' required> "
         "<input type='text' name='ip' placeholder='e.g., 0.0.0.0' required> "
         "<input type='submit' value='Add Rule'></form></div>");
 
-      // 渲染 Exceptions 區塊
+      // Render Exceptions section
       offset += snprintf(html + offset, 32768 - offset, "<h2>Exceptions (%zu / %d)</h2><table><tr><th>Domain Mask</th><th width='80'>Action</th></tr>", cfg->exception_count, MAX_EXCEPTIONS);
       for (size_t i = 0; i < cfg->exception_count; i++) {
         offset += snprintf(html + offset, 32768 - offset, 
           "<tr><td>%s</td>"
-          "<td><form action='/del_exception' method='POST' style='margin:0;'>"
+          "<td><form action='/del_exception' method='POST' style='margin:0;' onsubmit=\"return confirm('Are you sure you want to delete this exception?');\">"
           "<input type='hidden' name='mask' value='%s'>"
           "<input type='submit' class='btn-del' value='Delete'></form></td></tr>", 
           cfg->exceptions[i].mask, cfg->exceptions[i].mask);
@@ -233,7 +249,7 @@ void web_process_request(int listen_fd, app_config_t *cfg) {
 
       offset += snprintf(html + offset, 32768 - offset,
         "<div class='form-box'>"
-        "<form action='/add_exception' method='POST'>"
+        "<form action='/add_exception' method='POST' onsubmit=\"return confirm('Are you sure you want to add this exception?');\">"
         "<b>Add Exception: </b>"
         "<input type='text' name='mask' placeholder='e.g., feature.api.playstation.com' required> "
         "<input type='submit' value='Add Rule'></form></div>");

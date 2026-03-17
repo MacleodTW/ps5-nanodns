@@ -25,7 +25,7 @@
 #define MAX_LOG_PATH 256
 
 #define DNS_PORT 53
-#define WEB_PORT 8080
+#define DEFAULT_WEB_PORT 8080
 #define DEFAULT_TIMEOUT_MS 1500
 #define OVERRIDE_TTL 60
 
@@ -53,20 +53,21 @@ typedef struct {
   size_t exception_count;
   int timeout_ms;
   int debug_enabled;
+  int web_port;
   char log_path[MAX_LOG_PATH];
 } app_config_t;
 
 extern volatile sig_atomic_t g_running;
 extern int g_debug_enabled;
 
-// === utils.c (工具與日誌) ===
+// === utils.c (Utilities and Logging) ===
 int logger_init(const app_config_t *cfg);
 void logger_fini(void);
 void log_printf(const char *fmt, ...);
 void log_errno(const char *what);
 void normalize_domain(const char *input, char *output, size_t output_size);
 
-// === cfg.c (設定檔與規則配對) ===
+// === cfg.c (Configuration and Rule Matching) ===
 int ensure_runtime_dir_exists(const char *path);
 int ensure_default_config_exists(const char *path);
 int load_config(const char *path, app_config_t *cfg);
@@ -75,7 +76,7 @@ void config_apply_builtin_upstreams(app_config_t *cfg);
 int config_apply_builtin_overrides(app_config_t *cfg);
 void config_apply_builtin_exceptions(app_config_t *cfg);
 
-// 新增與刪除規則 / Upstream 的 API
+// API for Adding/Deleting Rules and Upstreams
 int config_add_upstream(app_config_t *cfg, const char *ip);
 int config_add_rule(app_config_t *cfg, const char *mask, const char *ip);
 int config_del_rule(app_config_t *cfg, const char *mask);
@@ -86,7 +87,7 @@ int config_save_all(const app_config_t *cfg);
 const override_rule_t *find_matching_rule(const app_config_t *cfg, const char *domain);
 int has_matching_exception(const app_config_t *cfg, const char *domain);
 
-// === 模組進入點 ===
+// === Module Entry Points ===
 void dns_process_request(int server_fd, const app_config_t *cfg);
 void web_process_request(int listen_fd, app_config_t *cfg);
 
