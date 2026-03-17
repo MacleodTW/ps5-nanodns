@@ -31,8 +31,10 @@ static void on_signal(int signo) {
 
 // === Network and System Environment Initialization ===
 static int elevate_privileges(void) {
+#ifndef PS4_HOST
   pid_t pid = getpid();
   if(kernel_set_ucred_authid(pid, PRIVILEGED_AUTHID) != 0) return -1;
+#endif
   return 0;
 }
 
