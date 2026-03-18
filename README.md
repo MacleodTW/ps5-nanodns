@@ -40,14 +40,16 @@ server=77.77.88.88
 timeout_ms=1500
 
 [overrides]
-*.playstation.com=0.0.0.0
-*.playstation.com.*=0.0.0.0
-playstation.com=0.0.0.0
-*.playstation.net=0.0.0.0
-*.playstation.net.*=0.0.0.0
-*.psndl.net=0.0.0.0
-playstation.net=0.0.0.0
-psndl.net=0.0.0.0
+*playstation*=0.0.0.0
+*sonyentertainmentnetwork*=0.0.0.0
+*ribob01*=0.0.0.0
+*akamai*=0.0.0.0
+*youtube*=0.0.0.0
+*ggpht*=0.0.0.0
+*googlevideo*=0.0.0.0
+*yt.be*=0.0.0.0
+*ytimg.com*=0.0.0.0
+*yt3.googleusercontent.com*=0.0.0.0
 # *.example.com=192.168.0.10
 # exact.host.local=10.0.0.42
 
