@@ -1,7 +1,7 @@
 # nanoDNS for Playstation
 - Load ps4-nanodns.elf or ps5-nanodns.elf to Playstation
 - Playstation network DNS server set to 127.0.0.1 (Loopback)
-- Web configure settings and rules (http://PS_IP:8080)
+- Browser configure settings and rules (http://PS_IP:8080)
 <img width="2823" height="1698" alt="image" src="https://github.com/user-attachments/assets/edbb5137-2b2e-449f-b7e0-15966257de01" />
 
 # Minimal Playstaiton payload DNS proxy that:
